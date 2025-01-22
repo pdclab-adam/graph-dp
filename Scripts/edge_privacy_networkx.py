@@ -105,8 +105,8 @@ mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
 # Compute the differentially private query response
 dp_triangle_count = mechanism.release(triangle_count, smooth_sensitivity)
 
-print("Exact triangle count = %i" % int(triangle_count))
-print("Differentially private triangle count = %f" % dp_triangle_count)
+print("Exact triangle count = %i" % int(triangle_count[0]))
+print("Differentially private triangle count = %f" % dp_triangle_count[0])
 
 
 # =============================================================================
@@ -198,5 +198,5 @@ mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
 # Compute the differentially private query response
 dp_mst_cost = mechanism.release(mst_cost, smooth_sensitivity)
 
-print("Exact MST cost = %f" % mst_cost)
-print("Differentially private MST cost = %f" % dp_mst_cost)
+print("Exact MST cost = %f" % mst_cost[0])
+print("Differentially private MST cost = %f" % dp_mst_cost[0])
