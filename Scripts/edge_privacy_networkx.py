@@ -7,19 +7,20 @@ import numpy as np
 import networkx as nx
 from relm.mechanisms import CauchyMechanism
 
+
 # =============================================================================
 # Triangle Counts
 # =============================================================================
 def ls_util(s, a, b, n):
-    """ Utility function used in computation of local sensitivities. """
+    """Utility function used in computation of local sensitivities."""
     return np.minimum(a + np.floor((s + np.minimum(s, b)) / 2.0), n - 2)
 
 
 def find_survivors(A, B, n):
-    """ Find surviving pairs A[i,j], B[i,j].
+    """Find surviving pairs A[i,j], B[i,j].
 
-        For each distinct value set(A), keep only the pair
-        (A[i,j], B[i,j]) with the largest value of B[i,j].
+    For each distinct value set(A), keep only the pair
+    (A[i,j], B[i,j]) with the largest value of B[i,j].
     """
     W = np.array(A).flatten()
     X = np.array(B).flatten()
@@ -30,8 +31,8 @@ def find_survivors(A, B, n):
     new_val_idxs = np.concatenate(
         (np.array([0]), np.where(delta)[0], np.array([len(Y)]))
     )
-    M = np.empty((len(new_val_idxs) - 1), dtype=np.int)
-    N = np.empty((len(new_val_idxs) - 1), dtype=np.int)
+    M = np.empty((len(new_val_idxs) - 1), dtype=int)
+    N = np.empty((len(new_val_idxs) - 1), dtype=int)
     for i in range(len(new_val_idxs) - 1):
         M[i] = Y[new_val_idxs[i]]
         N[i] = np.max(Z[new_val_idxs[i] : new_val_idxs[i + 1]])
@@ -39,18 +40,18 @@ def find_survivors(A, B, n):
 
 
 def first_hit(x, break_list):
-    """ Find the key for the first pair (k,v) with v > x. """
+    """Find the key for the first pair (k,v) with v > x."""
     return next((k for k, v in break_list if x <= v))
 
 
 def max_ls_util(s, break_list):
-    """ Compute the maximal value of f(s, a, b, n) over all possible a, b. """
+    """Compute the maximal value of f(s, a, b, n) over all possible a, b."""
     a, b = first_hit(s, break_list)
     return ls_util(s, a, b, n)
 
 
 def local_sensitivity_dist(A, B, n):
-    """ Compute the local sensitivity at distance s for 0 <= s <= n. """
+    """Compute the local sensitivity at distance s for 0 <= s <= n."""
     M, N = find_survivors(A, B, n)
     prev_survivor = (M[0], N[0])
     break_points = {prev_survivor: n + 1}
@@ -68,12 +69,12 @@ def local_sensitivity_dist(A, B, n):
 
 # =============================================================================
 # Generate a random graph
-n = 2 ** 13
+n = 2**13
 p = 0.01
 g = nx.random_graphs.gnp_random_graph(n, p)
 
 # Compute the adjacency matrix
-M = nx.linalg.graphmatrix.adjacency_matrix(g).astype(np.int)
+M = nx.linalg.graphmatrix.adjacency_matrix(g).astype(int)
 
 # -----------------------------------------------------------------------------
 # Compute the partial count matrices
@@ -105,6 +106,7 @@ dp_triangle_count = mechanism.release(triangle_count, smooth_sensitivity)
 
 print("Exact triangle count = %i" % int(triangle_count))
 print("Differentially private triangle count = %f" % dp_triangle_count)
+
 
 # =============================================================================
 # Minimum Spanning Tree Cost
@@ -149,7 +151,7 @@ def first_hit_weight(k, w, bound, costs, **args):
 
 # =============================================================================
 # Generate a random graph
-n = 2 ** 8
+n = 2**8
 p = 0.1
 g = nx.random_graphs.gnp_random_graph(n=n, p=p)
 
