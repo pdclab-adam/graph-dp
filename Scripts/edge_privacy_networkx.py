@@ -3,6 +3,7 @@
 # by Kobbi Nissim, Sofya Raskhodnikova, and Adam Smith
 # using networkx and relm
 
+from typing import Any
 import numpy as np
 import networkx as nx
 from relm.mechanisms import CauchyMechanism
@@ -64,18 +65,17 @@ def local_sensitivity_dist(A, B, n):
             break_points[survivor] = n + 1
             prev_survivor = survivor
     break_list = sorted(break_points.items(), key=lambda _: _[1])
-    return np.array([max_ls_util(s, n, break_list) for s in range(n + 1)])
+    max_utils = [max_ls_util(s, n, break_list) for s in range(n + 1)]
+    return np.array(max_utils)
 
 
-def count_triangles(epsilon: float) -> float:
+def count_triangles(graph: nx.Graph, epsilon: float) -> float:
     # =============================================================================
-    # Generate a random graph
-    n = 2**13
-    p = 0.01
-    g = nx.random_graphs.gnp_random_graph(n, p)
+    # Count nodes
+    n = len(graph.nodes)
 
     # Compute the adjacency matrix
-    M = nx.linalg.graphmatrix.adjacency_matrix(g).astype(int)
+    M = nx.linalg.graphmatrix.adjacency_matrix(graph).astype(int)
 
     # -----------------------------------------------------------------------------
     # Compute the partial count matrices
@@ -96,7 +96,7 @@ def count_triangles(epsilon: float) -> float:
 
     # -----------------------------------------------------------------------------
     # Compute the exact triangle count
-    triangle_count = np.array([sum(nx.triangles(g).values()) / 3.0])
+    triangle_count = np.array([sum(nx.triangles(graph).values()) / 3.0])
 
     # Create a differentially private release mechanism
     beta = epsilon / 6.0
@@ -107,7 +107,7 @@ def count_triangles(epsilon: float) -> float:
 
     print("Exact triangle count = %i" % int(triangle_count[0]))
     print("Differentially private triangle count = %f" % dp_triangle_count[0])
-    return dp_triangle_count
+    return dp_triangle_count[0]
 
 
 # =============================================================================
@@ -151,33 +151,31 @@ def first_hit_weight(k, w, g, bound, costs, **args):
     return w[high]
 
 
-def minimum_spanning_tree_costs(epsilon: float):
+def minimum_spanning_tree_costs(graph: nx.Graph, epsilon: float):
     # =============================================================================
     # Generate a random graph
-    n = 2**8
-    p = 0.1
-    g = nx.random_graphs.gnp_random_graph(n=n, p=p)
+    n = len(graph.nodes)
 
     bound = 10.0  # An upper bound on the edge weights in the graph
-    weights = {e: bound * np.random.randint(1, 11) / 10.0 for e in g.edges()}
-    nx.set_edge_attributes(g, weights, "weight")
+    weights = {e: bound * np.random.randint(1, 11) / 10.0 for e in graph.edges()}
+    nx.set_edge_attributes(graph, weights, "weight")
 
-    edge_weights = [g.edges[e]["weight"] for e in g.edges()]
+    edge_weights = [graph.edges[e]["weight"] for e in graph.edges()]
     edge_weights = sorted(set(edge_weights))
 
     # -----------------------------------------------------------------------------
     # Compute the local sensitivity at distance s for 0 <= s <= n
     costs = dict()
     lsd1 = np.array(
-        [first_hit_weight(k, edge_weights, g, bound, costs) for k in range(n + 1)]
+        [first_hit_weight(k, edge_weights, graph, bound, costs) for k in range(n + 1)]
     )
 
-    mst = nx.minimum_spanning_tree(g)
+    mst = nx.minimum_spanning_tree(graph)
     lsd2 = np.zeros(n + 1)
     for e in mst.edges():
         costs = dict()
         first_hit_weights = [
-            first_hit_weight(k + 1, edge_weights, g, bound, costs, s=e[0], t=e[1])
+            first_hit_weight(k + 1, edge_weights, graph, bound, costs, s=e[0], t=e[1])
             for k in range(n + 1)
         ]
         lsd2_e = np.array(first_hit_weights) - mst.edges[e]["weight"]
@@ -192,7 +190,7 @@ def minimum_spanning_tree_costs(epsilon: float):
 
     # -----------------------------------------------------------------------------
     # Compute the exact MST cost
-    mst = nx.minimum_spanning_tree(g)
+    mst = nx.minimum_spanning_tree(graph)
     mst_cost = np.array([mst.size(weight="weight")])
 
     # Create a differentiall private release mechanism
@@ -203,8 +201,21 @@ def minimum_spanning_tree_costs(epsilon: float):
 
     print("Exact MST cost = %f" % mst_cost[0])
     print("Differentially private MST cost = %f" % dp_mst_cost[0])
+    return dp_mst_cost[0]
+
+
+def run(input_file: str, run_id: int, epsilon: float) -> dict:
+    graph = nx.read_edgelist(input_file)
+    n_triangles = count_triangles(graph, epsilon)
+    result = {}
+    result["id"] = run_id
+    result["n_triangles"] = n_triangles
+    return result
 
 
 if __name__ == "__main__":
     epsilon = 1.0
-    count_triangles(epsilon)
+    replications = 2
+    input_file = "enron-10000.txt"
+    results: list = [run(input_file, run_id, epsilon) for run_id in range(replications)]
+    print(results, flush=True)
