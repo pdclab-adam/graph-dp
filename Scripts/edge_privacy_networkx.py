@@ -44,7 +44,7 @@ def first_hit(x, break_list):
     return next((k for k, v in break_list if x <= v))
 
 
-def max_ls_util(s, break_list):
+def max_ls_util(s, n, break_list):
     """Compute the maximal value of f(s, a, b, n) over all possible a, b."""
     a, b = first_hit(s, break_list)
     return ls_util(s, a, b, n)
@@ -64,49 +64,50 @@ def local_sensitivity_dist(A, B, n):
             break_points[survivor] = n + 1
             prev_survivor = survivor
     break_list = sorted(break_points.items(), key=lambda _: _[1])
-    return np.array([max_ls_util(s, break_list) for s in range(n + 1)])
+    return np.array([max_ls_util(s, n, break_list) for s in range(n + 1)])
 
 
-# =============================================================================
-# Generate a random graph
-n = 2**13
-p = 0.01
-g = nx.random_graphs.gnp_random_graph(n, p)
+def count_triangles():
+    # =============================================================================
+    # Generate a random graph
+    n = 2**13
+    p = 0.01
+    g = nx.random_graphs.gnp_random_graph(n, p)
 
-# Compute the adjacency matrix
-M = nx.linalg.graphmatrix.adjacency_matrix(g).astype(int)
+    # Compute the adjacency matrix
+    M = nx.linalg.graphmatrix.adjacency_matrix(g).astype(int)
 
-# -----------------------------------------------------------------------------
-# Compute the partial count matrices
-A = (M @ M).todense()
-B = M.sum(0) + M.sum(1) - 2 * A
+    # -----------------------------------------------------------------------------
+    # Compute the partial count matrices
+    A = (M @ M).todense()
+    B = M.sum(0) + M.sum(1) - 2 * A
 
-# Zero out the main diagonal because we are
-# interested only in indices (i,j) with i != j
-np.fill_diagonal(A, 0)
-np.fill_diagonal(B, 0)
+    # Zero out the main diagonal because we are
+    # interested only in indices (i,j) with i != j
+    np.fill_diagonal(A, 0)
+    np.fill_diagonal(B, 0)
 
-# Compute the local sensitivity at distance s for 0 <= s <= n
-lsd = local_sensitivity_dist(A, B, n)
+    # Compute the local sensitivity at distance s for 0 <= s <= n
+    lsd = local_sensitivity_dist(A, B, n)
 
-# Compute the smooth sensitivity
-epsilon = 1.0
-smooth_scaling = np.exp(-epsilon * np.arange(n + 1))
-smooth_sensitivity = np.max(lsd * smooth_scaling)
+    # Compute the smooth sensitivity
+    epsilon = 1.0
+    smooth_scaling = np.exp(-epsilon * np.arange(n + 1))
+    smooth_sensitivity = np.max(lsd * smooth_scaling)
 
-# -----------------------------------------------------------------------------
-# Compute the exact triangle count
-triangle_count = np.array([sum(nx.triangles(g).values()) / 3.0])
+    # -----------------------------------------------------------------------------
+    # Compute the exact triangle count
+    triangle_count = np.array([sum(nx.triangles(g).values()) / 3.0])
 
-# Create a differentially private release mechanism
-beta = epsilon / 6.0
-mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
+    # Create a differentially private release mechanism
+    beta = epsilon / 6.0
+    mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
 
-# Compute the differentially private query response
-dp_triangle_count = mechanism.release(triangle_count, smooth_sensitivity)
+    # Compute the differentially private query response
+    dp_triangle_count = mechanism.release(triangle_count, smooth_sensitivity)
 
-print("Exact triangle count = %i" % int(triangle_count[0]))
-print("Differentially private triangle count = %f" % dp_triangle_count[0])
+    print("Exact triangle count = %i" % int(triangle_count[0]))
+    print("Differentially private triangle count = %f" % dp_triangle_count[0])
 
 
 # =============================================================================
@@ -129,7 +130,7 @@ def retrieve(costs, key, g, w, **args):
     return costs[key]
 
 
-def first_hit_weight(k, w, bound, costs, **args):
+def first_hit_weight(k, w, g, bound, costs, **args):
     cost = retrieve(costs, len(w) - 1, g, w, **args)
     if cost <= k:
         return bound
@@ -150,53 +151,61 @@ def first_hit_weight(k, w, bound, costs, **args):
     return w[high]
 
 
-# =============================================================================
-# Generate a random graph
-n = 2**8
-p = 0.1
-g = nx.random_graphs.gnp_random_graph(n=n, p=p)
+def minimum_spanning_tree_costs():
+    # =============================================================================
+    # Generate a random graph
+    n = 2**8
+    p = 0.1
+    g = nx.random_graphs.gnp_random_graph(n=n, p=p)
 
-bound = 10.0  # An upper bound on the edge weights in the graph
-weights = {e: bound * np.random.randint(1, 11) / 10.0 for e in g.edges()}
-nx.set_edge_attributes(g, weights, "weight")
+    bound = 10.0  # An upper bound on the edge weights in the graph
+    weights = {e: bound * np.random.randint(1, 11) / 10.0 for e in g.edges()}
+    nx.set_edge_attributes(g, weights, "weight")
 
-edge_weights = [g.edges[e]["weight"] for e in g.edges()]
-edge_weights = sorted(set(edge_weights))
+    edge_weights = [g.edges[e]["weight"] for e in g.edges()]
+    edge_weights = sorted(set(edge_weights))
 
-# -----------------------------------------------------------------------------
-# Compute the local sensitivity at distance s for 0 <= s <= n
-costs = dict()
-lsd1 = np.array([first_hit_weight(k, edge_weights, bound, costs) for k in range(n + 1)])
-
-mst = nx.minimum_spanning_tree(g)
-lsd2 = np.zeros(n + 1)
-for e in mst.edges():
+    # -----------------------------------------------------------------------------
+    # Compute the local sensitivity at distance s for 0 <= s <= n
     costs = dict()
-    first_hit_weights = [
-        first_hit_weight(k + 1, edge_weights, bound, costs, s=e[0], t=e[1])
-        for k in range(n + 1)
-    ]
-    lsd2_e = np.array(first_hit_weights) - mst.edges[e]["weight"]
-    lsd2 = np.maximum(lsd2, lsd2_e)
+    lsd1 = np.array(
+        [first_hit_weight(k, edge_weights, g, bound, costs) for k in range(n + 1)]
+    )
 
-lsd = np.maximum(lsd1, lsd2)
+    mst = nx.minimum_spanning_tree(g)
+    lsd2 = np.zeros(n + 1)
+    for e in mst.edges():
+        costs = dict()
+        first_hit_weights = [
+            first_hit_weight(k + 1, edge_weights, g, bound, costs, s=e[0], t=e[1])
+            for k in range(n + 1)
+        ]
+        lsd2_e = np.array(first_hit_weights) - mst.edges[e]["weight"]
+        lsd2 = np.maximum(lsd2, lsd2_e)
 
-# Compute the smooth sensitivity
-epsilon = 1.0
-beta = epsilon / 6.0
-smooth_scaling = np.exp(-beta * np.arange(n + 1))
-smooth_sensitivity = np.max(lsd * smooth_scaling)
+    lsd = np.maximum(lsd1, lsd2)
 
-# -----------------------------------------------------------------------------
-# Compute the exact MST cost
-mst = nx.minimum_spanning_tree(g)
-mst_cost = np.array([mst.size(weight="weight")])
+    # Compute the smooth sensitivity
+    epsilon = 1.0
+    beta = epsilon / 6.0
+    smooth_scaling = np.exp(-beta * np.arange(n + 1))
+    smooth_sensitivity = np.max(lsd * smooth_scaling)
 
-# Create a differentiall private release mechanism
-mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
+    # -----------------------------------------------------------------------------
+    # Compute the exact MST cost
+    mst = nx.minimum_spanning_tree(g)
+    mst_cost = np.array([mst.size(weight="weight")])
 
-# Compute the differentially private query response
-dp_mst_cost = mechanism.release(mst_cost, smooth_sensitivity)
+    # Create a differentiall private release mechanism
+    mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
 
-print("Exact MST cost = %f" % mst_cost[0])
-print("Differentially private MST cost = %f" % dp_mst_cost[0])
+    # Compute the differentially private query response
+    dp_mst_cost = mechanism.release(mst_cost, smooth_sensitivity)
+
+    print("Exact MST cost = %f" % mst_cost[0])
+    print("Differentially private MST cost = %f" % dp_mst_cost[0])
+
+
+if __name__ == "__main__":
+    count_triangles()
+    minimum_spanning_tree_costs()
