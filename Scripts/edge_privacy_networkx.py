@@ -67,7 +67,7 @@ def local_sensitivity_dist(A, B, n):
     return np.array([max_ls_util(s, n, break_list) for s in range(n + 1)])
 
 
-def count_triangles():
+def count_triangles(epsilon: float) -> float:
     # =============================================================================
     # Generate a random graph
     n = 2**13
@@ -91,7 +91,6 @@ def count_triangles():
     lsd = local_sensitivity_dist(A, B, n)
 
     # Compute the smooth sensitivity
-    epsilon = 1.0
     smooth_scaling = np.exp(-epsilon * np.arange(n + 1))
     smooth_sensitivity = np.max(lsd * smooth_scaling)
 
@@ -108,6 +107,7 @@ def count_triangles():
 
     print("Exact triangle count = %i" % int(triangle_count[0]))
     print("Differentially private triangle count = %f" % dp_triangle_count[0])
+    return dp_triangle_count
 
 
 # =============================================================================
@@ -151,7 +151,7 @@ def first_hit_weight(k, w, g, bound, costs, **args):
     return w[high]
 
 
-def minimum_spanning_tree_costs():
+def minimum_spanning_tree_costs(epsilon: float):
     # =============================================================================
     # Generate a random graph
     n = 2**8
@@ -186,7 +186,6 @@ def minimum_spanning_tree_costs():
     lsd = np.maximum(lsd1, lsd2)
 
     # Compute the smooth sensitivity
-    epsilon = 1.0
     beta = epsilon / 6.0
     smooth_scaling = np.exp(-beta * np.arange(n + 1))
     smooth_sensitivity = np.max(lsd * smooth_scaling)
@@ -207,5 +206,5 @@ def minimum_spanning_tree_costs():
 
 
 if __name__ == "__main__":
-    count_triangles()
-    minimum_spanning_tree_costs()
+    epsilon = 1.0
+    count_triangles(epsilon)
