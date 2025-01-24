@@ -4,6 +4,7 @@
 # using networkx and relm
 
 from typing import Any
+from common import *
 import numpy as np
 import networkx as nx
 from relm.mechanisms import CauchyMechanism
@@ -214,8 +215,32 @@ def run(input_file: str, run_id: int, epsilon: float) -> dict:
 
 
 if __name__ == "__main__":
-    epsilon = 1.0
-    replications = 2
-    input_file = "enron-10000.txt"
-    results: list = [run(input_file, run_id, epsilon) for run_id in range(replications)]
-    print(results, flush=True)
+
+    args = parse_args()
+    input_file: str = args.input_file
+    output_file: str = args.output_file
+    epsilon: float = args.epsilon
+    delta: float = args.delta
+    replications: int = args.replications
+    disable: bool = args.disable
+
+    if disable:
+        log("Disabled by user input")
+        log()
+        alert = "disabled"
+        write_results(output_file, args, alert)
+        status = 0
+        log(f"********** Exit Status {status} **********")
+        exit({status})
+
+    log(f"Running {replications} replications")
+    results: list[dict[str, Any]] = [
+        run(input_file, run_id, epsilon) for run_id in range(replications)
+    ]
+    log(f"Running {replications} replications - Done")
+    log()
+
+    alert = None
+    write_results(output_file, args, alert, results)
+
+    log("************** Done! **************")
