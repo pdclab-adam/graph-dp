@@ -68,117 +68,113 @@ def bounded_degree_flow(G, h, D):
     return -res.fun
 
 
-# =============================================================================
-# Generate a random graph
-n = 2**7
-p = 2**-6
-G = nx.random_graphs.gnp_random_graph(n, p)
+def run():
+    # =============================================================================
+    # Generate a random graph
+    n = 2**7
+    p = 2**-6
+    G = nx.random_graphs.gnp_random_graph(n, p)
 
-# Set the degree bound
-D = 2**3
+    # Set the degree bound
+    D = 2**3
 
-# -----------------------------------------------------------------------------
-# edge count
-h = np.arange(n + 1) / 2.0
+    # -----------------------------------------------------------------------------
+    # edge count
+    h = np.arange(n + 1) / 2.0
 
-# Compute exact edge count
-print("Exact edge count = %i" % exact_count(G, h))
+    # Compute exact edge count
+    print("Exact edge count = %i" % exact_count(G, h))
 
-# Compute max flow for graphs of bounded degree
-bd_res = bounded_degree_flow(G, h, D)
-print("Bounded-degree edge count = %f" % bd_res)
+    # Compute max flow for graphs of bounded degree
+    bd_res = bounded_degree_flow(G, h, D)
+    print("Bounded-degree edge count = %f" % bd_res)
 
-# Create a differentially private release mechanism
-epsilon = 1.0
-sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
-mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
+    # Create a differentially private release mechanism
+    epsilon = 1.0
+    sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
+    mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
-# Compute the differentially private query response
-dp_edge_count = mechanism.release(np.array([bd_res]))[0]
-print("Differentially private edge count = %f\n" % dp_edge_count)
+    # Compute the differentially private query response
+    dp_edge_count = mechanism.release(np.array([bd_res]))[0]
+    print("Differentially private edge count = %f\n" % dp_edge_count)
 
-# -----------------------------------------------------------------------------
-# node count
-h = np.ones(n + 1)
+    # -----------------------------------------------------------------------------
+    # node count
+    h = np.ones(n + 1)
 
-# Compute exact node count
-print("Exact node count = %i" % exact_count(G, h))
+    # Compute exact node count
+    print("Exact node count = %i" % exact_count(G, h))
 
-# Compute max flow for graphs of bounded degree
-bd_res = bounded_degree_flow(G, h, D)
-print("Bounded-degree node count = %f" % bd_res)
+    # Compute max flow for graphs of bounded degree
+    bd_res = bounded_degree_flow(G, h, D)
+    print("Bounded-degree node count = %f" % bd_res)
 
-# Create a differentially private release mechanism
-epsilon = 1.0
-y = h[: (D + 1)]
-sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
-mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
+    # Create a differentially private release mechanism
+    epsilon = 1.0
+    y = h[: (D + 1)]
+    sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
+    mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
-# Compute the differentially private query response
-dp_node_count = mechanism.release(np.array([bd_res]))[0]
-print("Differentially private node count = %f\n" % dp_node_count)
+    # Compute the differentially private query response
+    dp_node_count = mechanism.release(np.array([bd_res]))[0]
+    print("Differentially private node count = %f\n" % dp_node_count)
 
-# -----------------------------------------------------------------------------
-# k-star count
-k = 2
-h = scipy.special.comb(np.arange(n + 1), k)
+    # -----------------------------------------------------------------------------
+    # k-star count
+    k = 2
+    h = scipy.special.comb(np.arange(n + 1), k)
 
-# Compute exact k-star count
-print("Exact k-star count = %i" % exact_count(G, h))
+    # Compute exact k-star count
+    print("Exact k-star count = %i" % exact_count(G, h))
 
-# Compute max flow for graphs of bounded degree
-bd_res = bounded_degree_flow(G, h, D)
-print("Bounded-degree k-star count = %f" % bd_res)
+    # Compute max flow for graphs of bounded degree
+    bd_res = bounded_degree_flow(G, h, D)
+    print("Bounded-degree k-star count = %f" % bd_res)
 
-# Create a differentially private release mechanism
-epsilon = 1.0
-y = h[: (D + 1)]
-sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
-mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
+    # Create a differentially private release mechanism
+    epsilon = 1.0
+    y = h[: (D + 1)]
+    sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
+    mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
-# Compute the differentially private query response
-dp_kstar_count = mechanism.release(np.array([bd_res]))[0]
-print("Differentially private k-star count = %f\n" % dp_kstar_count)
+    # Compute the differentially private query response
+    dp_kstar_count = mechanism.release(np.array([bd_res]))[0]
+    print("Differentially private k-star count = %f\n" % dp_kstar_count)
 
-# =============================================================================
-# Linear Programming
-# =============================================================================
-# Generate a random graph
-n = 2**7
-p = 2**-4
-G = nx.random_graphs.gnp_random_graph(n, p)
+    # =============================================================================
+    # Linear Programming
+    # =============================================================================
 
-# Set the degree bound
-D = 2**2
+    # Compute the exact triangle count
+    k = 3
+    triangles = nx.triads_by_type(nx.DiGraph(G))["300"]
+    print("Exact triangle count = %i" % len(triangles))
 
-# -----------------------------------------------------------------------------
-# Compute the exact triangle count
-k = 3
-triangles = nx.triads_by_type(nx.DiGraph(G))["300"]
-print("Exact triangle count = %i" % len(triangles))
+    # Compute bounded-degree triangle count using linear programming
+    c = -np.ones(len(triangles))
+    A_ub = np.zeros((n, len(triangles)))
+    for i, t in enumerate(triangles):
+        nodes = triangles[i].nodes()
+        for node in nodes:
+            A_ub[node, i] = 1
 
-# Compute bounded-degree triangle count using linear programming
-c = -np.ones(len(triangles))
-A_ub = np.zeros((n, len(triangles)))
-for i, t in enumerate(triangles):
-    nodes = triangles[i].nodes()
-    for node in nodes:
-        A_ub[node, i] = 1
+    sensitivity = k * D * (D - 1) ** (k - 2)
+    b_ub = np.ones(n) * sensitivity
+    bounds = (0.0, 1.0)
 
-sensitivity = k * D * (D - 1) ** (k - 2)
-b_ub = np.ones(n) * sensitivity
-bounds = (0.0, 1.0)
+    res = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds)
+    print("Bounded-degree triangle count = %f" % -res.fun)
 
-res = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds)
-print("Bounded-degree triangle count = %f" % -res.fun)
+    # Create a differentially private release mechanism
+    epsilon = 1.0
+    mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
-# Create a differentially private release mechanism
-epsilon = 1.0
-mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
+    # Compute the differentially private query response
+    dp_triangle_count = mechanism.release(np.array([-res.fun]))[0]
+    print("Differentially private triangle count = %f\n" % dp_triangle_count)
 
-# Compute the differentially private query response
-dp_triangle_count = mechanism.release(np.array([-res.fun]))[0]
-print("Differentially private triangle count = %f\n" % dp_triangle_count)
+
+run()
 
 
 # =============================================================================
