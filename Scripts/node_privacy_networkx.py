@@ -161,16 +161,18 @@ def run():
     sensitivity = k * D * (D - 1) ** (k - 2)
     b_ub = np.ones(n) * sensitivity
     bounds = (0.0, 1.0)
-
-    res = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds)
-    print("Bounded-degree triangle count = %f" % -res.fun)
+    triangle_count = -0.0
+    if len(c) != 0:
+        res = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds)
+        triangle_count = res.fun
+    print("Bounded-degree triangle count = %f" % -triangle_count)
 
     # Create a differentially private release mechanism
     epsilon = 1.0
     mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
     # Compute the differentially private query response
-    dp_triangle_count = mechanism.release(np.array([-res.fun]))[0]
+    dp_triangle_count = mechanism.release(np.array([-triangle_count]))[0]
     print("Differentially private triangle count = %f\n" % dp_triangle_count)
 
 
