@@ -10,6 +10,7 @@ import scipy.optimize
 import scipy.interpolate
 import scipy.special
 
+from common import *
 from relm.mechanisms import LaplaceMechanism, CauchyMechanism
 
 
@@ -68,12 +69,11 @@ def bounded_degree_flow(G, h, D):
     return -res.fun
 
 
-def run():
+def run(input_file, run_id, epsilon):
     # =============================================================================
     # Generate a random graph
-    n = 2**7
-    p = 2**-6
-    G = nx.random_graphs.gnp_random_graph(n, p)
+    G = nx.read_edgelist(input_file)
+    n = G.number_of_nodes() + 1
 
     # Set the degree bound
     D = 2**3
@@ -90,7 +90,6 @@ def run():
     print("Bounded-degree edge count = %f" % bd_res)
 
     # Create a differentially private release mechanism
-    epsilon = 1.0
     sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
     mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
@@ -110,7 +109,6 @@ def run():
     print("Bounded-degree node count = %f" % bd_res)
 
     # Create a differentially private release mechanism
-    epsilon = 1.0
     y = h[: (D + 1)]
     sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
     mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
@@ -132,7 +130,6 @@ def run():
     print("Bounded-degree k-star count = %f" % bd_res)
 
     # Create a differentially private release mechanism
-    epsilon = 1.0
     y = h[: (D + 1)]
     sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
     mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
@@ -156,8 +153,10 @@ def run():
     for i, t in enumerate(triangles):
         nodes = triangles[i].nodes()
         for node in nodes:
-            A_ub[node, i] = 1
+            A_ub[int(node), i] = 1
 
+    # Set the degree bound
+    D = 2**2
     sensitivity = k * D * (D - 1) ** (k - 2)
     b_ub = np.ones(n) * sensitivity
     bounds = (0.0, 1.0)
@@ -168,67 +167,52 @@ def run():
     print("Bounded-degree triangle count = %f" % -triangle_count)
 
     # Create a differentially private release mechanism
-    epsilon = 1.0
     mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
     # Compute the differentially private query response
     dp_triangle_count = mechanism.release(np.array([-triangle_count]))[0]
     print("Differentially private triangle count = %f\n" % dp_triangle_count)
+    result = {}
+    result["id"] = run_id
+    result["n_edges"] = dp_edge_count
+    result["n_nodes"] = dp_node_count
+    result["n_2_star"] = dp_kstar_count
+    result["n_triangles"] = dp_triangle_count
+    return result
 
 
-run()
+if __name__ == "__main__":
+    args = parse_args()
+    input_file: str = args.input_file
+    output_file: str = args.output_file
+    epsilon: float = args.epsilon
+    delta: float = args.delta
+    replications: int = args.replications
+    disable: bool = args.disable
 
+    if disable:
+        log("Disabled by user input")
+        log()
+        alert = "disabled"
+        write_results(output_file, args, alert)
+        status = 0
+        log(f"********** Exit Status {status} **********")
+        exit({status})
 
-# =============================================================================
-# Naive Degree Truncation
-# =============================================================================
-def truncate(G, D):
-    survivors = [node for node in G.nodes() if G.degree(node) <= D]
-    H = nx.subgraph(G, survivors)
-    return H
+    log(f"Running {replications} replications")
+    try:
+        results: list[dict[str, Any]] = [
+            run(input_file, run_id, epsilon) for run_id in range(replications)
+        ]
+        log(f"Running {replications} replications - Done")
+        log()
 
+        alert = None
+        write_results(output_file, args, alert, results)
 
-def truncation_smooth_sensitivity(G, D, beta):
-    n = len(G.nodes())
+    except:
+        alert = "error - graph probably too large"
+        results = None
+        write_results(output_file, args, alert, results)
 
-    # Compute bounds on the local sensitivity at distance s for 0 <= s <= D
-    hist = np.array(nx.degree_histogram(G))
-    pmf = np.zeros(n + 1)
-    pmf[: len(hist)] = hist
-    cmf = np.cumsum(pmf)
-    N = [
-        cmf[min(D + s + 1, len(cmf) - 1)] - cmf[max(D - s - 1, 0)] for s in range(n + 1)
-    ]
-    C = 1 + np.arange(n + 1) + N
-
-    beta = 1.0 / 6.0
-    smooth_sensitivity = np.max(np.exp(-beta * np.arange(n + 1)) * C)
-    return smooth_sensitivity
-
-
-# =============================================================================
-# Generate a random graph
-n = 2**10
-p = 2**-4
-G = nx.random_graphs.gnp_random_graph(n, p)
-
-# Set the degree bound
-D = 2**10
-
-# Compute exact query response on truncated graph, i.e. f(T(G))
-H = truncate(G, D)
-trunc_edge_count = np.array([len(H.edges())], dtype=float)
-
-# Create a differentially private release mechanism
-epsilon = 1.0
-beta = epsilon / 6.0
-mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
-
-# Compute the differentially private query response
-bounded_degree_f_sensitivity = D
-smooth_sensitivity = bounded_degree_f_sensitivity * truncation_smooth_sensitivity(
-    G, D, beta
-)
-dp_trunc_edge_count = mechanism.release(trunc_edge_count, smooth_sensitivity)
-
-# -----------------------------------------------------------------------------
+    log("************** Done! **************")
