@@ -12,6 +12,7 @@ import scipy.special
 
 from relm.mechanisms import LaplaceMechanism, CauchyMechanism
 
+
 # =============================================================================
 # Convex Optimization
 # =============================================================================
@@ -21,6 +22,7 @@ def exact_count(G, h):
     degree_histogram = np.array(nx.degree_histogram(G))
     exact_count = degree_histogram @ h_fun(np.arange(len(degree_histogram)))
     return exact_count
+
 
 def flow_graph(G, D):
     V_left = list(zip(["left"] * len(G), G.nodes()))
@@ -38,6 +40,7 @@ def flow_graph(G, D):
         [(("left", v), ("right", u), 1) for u, v in G.edges()], weight="capacity"
     )
     return F
+
 
 def bounded_degree_flow(G, h, D):
     F = flow_graph(G, D)
@@ -57,25 +60,26 @@ def bounded_degree_flow(G, h, D):
     constraint = scipy.optimize.LinearConstraint(adjacency[:-2], 0, 0)
 
     x = np.arange(D + 1)
-    h_fun = scipy.interpolate.interp1d(x, h[:D+1])
+    h_fun = scipy.interpolate.interp1d(x, h[: D + 1])
     f = lambda x, *args: -np.sum(h_fun(x[tuple(args[0])]))
     res = scipy.optimize.minimize(
         fun=f, x0=x0, args=[mask], bounds=bounds, constraints=[constraint]
     )
     return -res.fun
 
+
 # =============================================================================
 # Generate a random graph
 n = 2**7
-p = 2 ** -6
+p = 2**-6
 G = nx.random_graphs.gnp_random_graph(n, p)
 
 # Set the degree bound
-D = 2 ** 3
+D = 2**3
 
 # -----------------------------------------------------------------------------
 # edge count
-h = np.arange(n+1) / 2.0
+h = np.arange(n + 1) / 2.0
 
 # Compute exact edge count
 print("Exact edge count = %i" % exact_count(G, h))
@@ -86,7 +90,7 @@ print("Bounded-degree edge count = %f" % bd_res)
 
 # Create a differentially private release mechanism
 epsilon = 1.0
-sensitivity = np.max(h[:(D+1)]) + np.max(h[1:(D+1)] - h[:D])
+sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
 mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
 # Compute the differentially private query response
@@ -95,7 +99,7 @@ print("Differentially private edge count = %f\n" % dp_edge_count)
 
 # -----------------------------------------------------------------------------
 # node count
-h = np.ones(n+1)
+h = np.ones(n + 1)
 
 # Compute exact node count
 print("Exact node count = %i" % exact_count(G, h))
@@ -106,8 +110,8 @@ print("Bounded-degree node count = %f" % bd_res)
 
 # Create a differentially private release mechanism
 epsilon = 1.0
-y = h[:(D+1)]
-sensitivity = np.max(h[:(D+1)]) + np.max(h[1:(D+1)] - h[:D])
+y = h[: (D + 1)]
+sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
 mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
 # Compute the differentially private query response
@@ -117,7 +121,7 @@ print("Differentially private node count = %f\n" % dp_node_count)
 # -----------------------------------------------------------------------------
 # k-star count
 k = 2
-h = scipy.special.comb(np.arange(n+1), k)
+h = scipy.special.comb(np.arange(n + 1), k)
 
 # Compute exact k-star count
 print("Exact k-star count = %i" % exact_count(G, h))
@@ -128,8 +132,8 @@ print("Bounded-degree k-star count = %f" % bd_res)
 
 # Create a differentially private release mechanism
 epsilon = 1.0
-y = h[:(D+1)]
-sensitivity = np.max(h[:(D+1)]) + np.max(h[1:(D+1)] - h[:D])
+y = h[: (D + 1)]
+sensitivity = np.max(h[: (D + 1)]) + np.max(h[1 : (D + 1)] - h[:D])
 mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 
 # Compute the differentially private query response
@@ -140,12 +144,12 @@ print("Differentially private k-star count = %f\n" % dp_kstar_count)
 # Linear Programming
 # =============================================================================
 # Generate a random graph
-n = 2 ** 7
-p = 2 ** -4
+n = 2**7
+p = 2**-4
 G = nx.random_graphs.gnp_random_graph(n, p)
 
 # Set the degree bound
-D = 2 ** 2
+D = 2**2
 
 # -----------------------------------------------------------------------------
 # Compute the exact triangle count
@@ -176,6 +180,7 @@ mechanism = LaplaceMechanism(epsilon=epsilon, sensitivity=sensitivity)
 dp_triangle_count = mechanism.release(np.array([-res.fun]))[0]
 print("Differentially private triangle count = %f\n" % dp_triangle_count)
 
+
 # =============================================================================
 # Naive Degree Truncation
 # =============================================================================
@@ -184,42 +189,48 @@ def truncate(G, D):
     H = nx.subgraph(G, survivors)
     return H
 
+
 def truncation_smooth_sensitivity(G, D, beta):
     n = len(G.nodes())
 
     # Compute bounds on the local sensitivity at distance s for 0 <= s <= D
     hist = np.array(nx.degree_histogram(G))
-    pmf = np.zeros(n+1)
-    pmf[:len(hist)] = hist
+    pmf = np.zeros(n + 1)
+    pmf[: len(hist)] = hist
     cmf = np.cumsum(pmf)
-    N = [cmf[min(D+s+1, len(cmf)-1)] - cmf[max(D-s-1, 0)] for s in range(n+1)]
-    C = 1 + np.arange(n+1) + N
+    N = [
+        cmf[min(D + s + 1, len(cmf) - 1)] - cmf[max(D - s - 1, 0)] for s in range(n + 1)
+    ]
+    C = 1 + np.arange(n + 1) + N
 
-    beta = 1.0/6.0
-    smooth_sensitivity = np.max(np.exp(-beta*np.arange(n+1)) * C)
+    beta = 1.0 / 6.0
+    smooth_sensitivity = np.max(np.exp(-beta * np.arange(n + 1)) * C)
     return smooth_sensitivity
+
 
 # =============================================================================
 # Generate a random graph
-n = 2 ** 10
-p = 2 ** -4
+n = 2**10
+p = 2**-4
 G = nx.random_graphs.gnp_random_graph(n, p)
 
 # Set the degree bound
-D = 2 ** 10
+D = 2**10
 
 # Compute exact query response on truncated graph, i.e. f(T(G))
 H = truncate(G, D)
-trunc_edge_count = np.array([len(H.edges())], dtype=np.float)
+trunc_edge_count = np.array([len(H.edges())], dtype=float)
 
 # Create a differentially private release mechanism
 epsilon = 1.0
-beta = epsilon/6.0
+beta = epsilon / 6.0
 mechanism = CauchyMechanism(epsilon=epsilon, beta=beta)
 
 # Compute the differentially private query response
 bounded_degree_f_sensitivity = D
-smooth_sensitivity = bounded_degree_f_sensitivity * truncation_smooth_sensitivity(G, D, beta)
+smooth_sensitivity = bounded_degree_f_sensitivity * truncation_smooth_sensitivity(
+    G, D, beta
+)
 dp_trunc_edge_count = mechanism.release(trunc_edge_count, smooth_sensitivity)
 
 # -----------------------------------------------------------------------------
